@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Register</title>
+    <style>
+        body { font-family: Arial; max-width: 400px; margin: 50px auto; }
+        input { width: 100%; padding: 8px; margin: 8px 0; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #4CAF50; color: white; border: none; cursor: pointer; }
+        p { color: red; }
+        a { display: block; text-align: center; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Register</h2>
+    <input id="username" placeholder="Username" />
+    <input id="password" type="password" placeholder="Password" />
+    <button onclick="register()">Register</button>
+    <p id="msg"></p>
+    <a href="login.html">Account Байгаа юу? Login</a>
+
+    <script>
+    function register() {
+        const params = new URLSearchParams({
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value
+        });
+
+        fetch("http://localhost:8085/gateway/auth/register?" + params.toString(), {
+            method: "GET"
+        })
+        .then(r => r.json())
+        .then(data => {
+            console.log("Response:", data);
+            console.log("Message:", data.message);
+            if (data.message && data.message.indexOf("SUCCESS") !== -1) {
+                document.getElementById('msg').style.color = "green";
+                document.getElementById('msg').innerText = "Registered! Please login.";
+                setTimeout(() => window.location.href = "login.html", 1000);
+            } else {
+                document.getElementById('msg').innerText = "Failed: " + data.message;
+            }
+        })
+        .catch(err => {
+            document.getElementById('msg').innerText = "Error: " + err;
+        });
+    }
+</script>
+</body>
+</html>

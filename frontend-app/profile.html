@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Profile</title>
+    <style>
+        body { font-family: Arial; max-width: 500px; margin: 50px auto; }
+        input, textarea { width: 100%; padding: 8px; margin: 8px 0; box-sizing: border-box; }
+        button { padding: 10px 20px; background: #2196F3; color: white; border: none; cursor: pointer; margin: 5px; }
+        .danger { background: #f44336; }
+        #profileInfo { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        #msg { color: green; }
+    </style>
+</head>
+<body>
+    <h2>My Profile</h2>
+    <button onclick="logout()" class="danger">Logout</button>
+
+    <div id="profileInfo">Доор profile-аа үүсгэнэ үү.</div>
+
+    <h3>Create / Update Profile</h3>
+    <input id="name" placeholder="Full Name" />
+    <input id="email" placeholder="Email" />
+    <textarea id="bio" placeholder="Bio"></textarea>
+    <input id="phone" placeholder="Phone" />
+    <button onclick="saveProfile()">Profile хадгалах</button>
+    <p id="msg"></p>
+
+<script>
+var token = localStorage.getItem("token");
+var currentProfileId = localStorage.getItem("profileId");
+
+console.log("Token:", token);
+console.log("Profile ID:", currentProfileId);
+
+if (!token) {
+    window.location.href = "login.html";
+}
+
+if (currentProfileId) {
+    fetch("http://localhost:8084/users/" + currentProfileId, {
+        headers: { "Authorization": token }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        console.log("Profile loaded:", data);
+        if (data.id) {
+            showProfile(data);
+            document.getElementById('name').value = data.name || '';
+            document.getElementById('email').value = data.email || '';
+            document.getElementById('bio').value = data.bio || '';
+            document.getElementById('phone').value = data.phone || '';
+        } else {
+            // Profile not found on server, reset
+            localStorage.removeItem("profileId");
+            currentProfileId = null;
+        }
+    })
+    .catch(function(err) {
+        console.log("Load error:", err);
+        localStorage.removeItem("profileId");
+        currentProfileId = null;
+    });
+}
+
+function saveProfile() {
+    var name = document.getElementById('name').value;
+    var email = document.getElementById('email').value;
+    var bio = document.getElementById('bio').value;
+    var phone = document.getElementById('phone').value;
+
+    console.log("Saving...", name, email);
+
+    var params = new URLSearchParams({ name: name, email: email, bio: bio, phone: phone });
+
+    if (currentProfileId) {
+        fetch("http://localhost:8084/users/" + currentProfileId + "?" + params.toString(), {
+            method: "PUT",
+            headers: { "Authorization": token }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            console.log("Update response:", data);
+            if (data.error) {
+                localStorage.removeItem("profileId");
+                currentProfileId = null;
+                saveProfile();
+                return;
+            }
+            document.getElementById('msg').innerText = "Profile updated!";
+            showProfile(data);
+        })
+        .catch(function(err) { console.log("Update error:", err); });
+    } else {
+        fetch("http://localhost:8084/users?" + params.toString(), {
+            method: "POST",
+            headers: { "Authorization": token }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            console.log("Create response:", data);
+            if (data.getId) {
+                localStorage.setItem("profileId", data.id);
+                currentProfileId = data.id;
+                document.getElementById('msg').innerText = "Profile created!";
+                showProfile(data);
+            } else if (data.id) {
+                localStorage.setItem("profileId", data.id);
+                currentProfileId = data.id;
+                document.getElementById('msg').innerText = "Profile created!";
+                showProfile(data);
+            } else {
+                document.getElementById('msg').style.color = "red";
+                document.getElementById('msg').innerText = "Error: " + JSON.stringify(data);
+            }
+        })
+        .catch(function(err) { console.log("Create error:", err); });
+    }
+}
+
+function showProfile(data) {
+    document.getElementById('profileInfo').innerHTML =
+        '<b>Name:</b> ' + (data.name || '') + '<br>' +
+        '<b>Email:</b> ' + (data.email || '') + '<br>' +
+        '<b>Bio:</b> ' + (data.bio || '') + '<br>' +
+        '<b>Phone:</b> ' + (data.phone || '');
+}
+
+function logout() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("profileId");
+    window.location.href = "login.html";
+}
+</script>
+
+</body>
+</html>

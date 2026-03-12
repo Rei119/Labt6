@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+    <style>
+        body { font-family: Arial; max-width: 400px; margin: 50px auto; }
+        input { width: 100%; padding: 8px; margin: 8px 0; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #2196F3; color: white; border: none; cursor: pointer; }
+        p { color: red; }
+        a { display: block; text-align: center; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Login</h2>
+    <input id="username" placeholder="Username" />
+    <input id="password" type="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+    <p id="msg"></p>
+    <a href="register.html">Account Байхгүй Юү? Register</a>
+
+   <script>
+    function login() {
+        const params = new URLSearchParams({
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value
+        });
+
+        fetch("http://localhost:8085/gateway/auth/login?" + params.toString(), {
+            method: "GET"
+        })
+        .then(r => r.json())
+        .then(data => {
+            console.log("Response:", data);
+            if (data.token) {
+                localStorage.setItem("token", data.token);
+                window.location.href = "profile.html";
+            } else {
+                document.getElementById('msg').innerText = "Invalid username or password.";
+            }
+        })
+        .catch(err => {
+            document.getElementById('msg').innerText = "Error: " + err;
+        });
+    }
+</script>
+
+</body>
+</html>
