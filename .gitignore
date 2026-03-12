@@ -1,0 +1,8 @@
+.metadata
+apache-tomcat-10.0.27
+target
+*.class
+*.jar
+.settings
+.classpath
+.project
