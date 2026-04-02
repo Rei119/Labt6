@@ -12,7 +12,8 @@ public class UserController {
     @Autowired
     private AuthMiddleware authMiddleware;
 
-    private static Map<String, UserProfile> profiles = new HashMap<>();
+    @Autowired
+    private UserRepository userRepository; 
 
     private boolean isAuthorized(String token) {
         if (token == null) return false;
@@ -21,7 +22,6 @@ public class UserController {
 
     // ─── AUTH PROXY ───────────────────────────────────────────
 
-    // GET /auth/register
     @GetMapping("/auth/register")
     public ResponseEntity<?> register(
             @RequestParam String username,
@@ -35,19 +35,16 @@ public class UserController {
                 "</soapenv:Body></soapenv:Envelope>";
 
             String response = callSoap(soapRequest);
-
             java.util.regex.Matcher m = java.util.regex.Pattern
                 .compile("<return>(.*?)</return>")
                 .matcher(response);
             String message = m.find() ? m.group(1) : response;
-
             return ResponseEntity.ok("{\"message\":\"" + message + "\"}");
         } catch (Exception e) {
             return ResponseEntity.status(500).body("{\"error\":\"" + e.getMessage() + "\"}");
         }
     }
 
-    // GET /auth/login
     @GetMapping("/auth/login")
     public ResponseEntity<?> login(
             @RequestParam String username,
@@ -61,15 +58,13 @@ public class UserController {
                 "</soapenv:Body></soapenv:Envelope>";
 
             String response = callSoap(soapRequest);
-
             java.util.regex.Matcher m = java.util.regex.Pattern
                 .compile("<return>(.*?)</return>")
                 .matcher(response);
             String token = m.find() ? m.group(1) : "";
 
-            if (token.startsWith("ERROR") || token.isEmpty()) {
+            if (token.startsWith("ERROR") || token.isEmpty())
                 return ResponseEntity.status(401).body("{\"error\":\"Invalid credentials\"}");
-            }
 
             return ResponseEntity.ok("{\"token\":\"" + token + "\"}");
         } catch (Exception e) {
@@ -79,7 +74,6 @@ public class UserController {
 
     // ─── USER PROFILE CRUD ────────────────────────────────────
 
-    // POST /users - profile uusgeh
     @PostMapping("/users")
     public ResponseEntity<?> createProfile(
             @RequestHeader("Authorization") String token,
@@ -98,10 +92,10 @@ public class UserController {
         p.setBio(bio);
         p.setPhone(phone);
 
+        userRepository.save(p); // Save to MongoDB
         return ResponseEntity.ok(p);
     }
 
-    // GET /users/:id - profile harah
     @GetMapping("/users/{id}")
     public ResponseEntity<?> getProfile(
             @RequestHeader("Authorization") String token,
@@ -110,14 +104,21 @@ public class UserController {
         if (!isAuthorized(token))
             return ResponseEntity.status(401).body("{\"error\":\"Unauthorized\"}");
 
-        UserProfile p = profiles.get(id);
-        if (p == null)
-            return ResponseEntity.status(404).body("{\"error\":\"Not found\"}");
-
-        return ResponseEntity.ok(p);
+        return userRepository.findById(id)
+            .map(p -> ResponseEntity.ok((Object) p))
+            .orElse(ResponseEntity.status(404).body("{\"error\":\"Not found\"}"));
     }
 
-    // PUT /users/:id - profile update hiih
+    @GetMapping("/users")
+    public ResponseEntity<?> getAllProfiles(
+            @RequestHeader("Authorization") String token) {
+
+        if (!isAuthorized(token))
+            return ResponseEntity.status(401).body("{\"error\":\"Unauthorized\"}");
+
+        return ResponseEntity.ok(userRepository.findAll());
+    }
+
     @PutMapping("/users/{id}")
     public ResponseEntity<?> updateProfile(
             @RequestHeader("Authorization") String token,
@@ -129,18 +130,32 @@ public class UserController {
         if (!isAuthorized(token))
             return ResponseEntity.status(401).body("{\"error\":\"Unauthorized\"}");
 
-        UserProfile p = profiles.get(id);
-        if (p == null)
-            return ResponseEntity.status(404).body("{\"error\":\"Not found\"}");
-
-        if (name != null) p.setName(name);
-        if (bio != null) p.setBio(bio);
-        if (phone != null) p.setPhone(phone);
-
-        return ResponseEntity.ok(p);
+        return userRepository.findById(id).map(p -> {
+            if (name != null) p.setName(name);
+            if (bio != null) p.setBio(bio);
+            if (phone != null) p.setPhone(phone);
+            userRepository.save(p); // Save updated to MongoDB
+            return ResponseEntity.ok((Object) p);
+        }).orElse(ResponseEntity.status(404).body("{\"error\":\"Not found\"}"));
     }
 
-    // DELETE /users/:id -Profile ustgah
+
+    @PatchMapping("/users/{id}/image")
+    public ResponseEntity<?> updateProfileImage(
+            @RequestHeader("Authorization") String token,
+            @PathVariable String id,
+            @RequestParam String imageUrl) {
+
+        if (!isAuthorized(token))
+            return ResponseEntity.status(401).body("{\"error\":\"Unauthorized\"}");
+
+        return userRepository.findById(id).map(p -> {
+            p.setProfileImage(imageUrl);
+            userRepository.save(p);
+            return ResponseEntity.ok((Object) p);
+        }).orElse(ResponseEntity.status(404).body("{\"error\":\"Not found\"}"));
+    }
+
     @DeleteMapping("/users/{id}")
     public ResponseEntity<?> deleteProfile(
             @RequestHeader("Authorization") String token,
@@ -149,11 +164,11 @@ public class UserController {
         if (!isAuthorized(token))
             return ResponseEntity.status(401).body("{\"error\":\"Unauthorized\"}");
 
-        profiles.remove(id);
+        userRepository.deleteById(id);
         return ResponseEntity.ok("{\"message\":\"Deleted\"}");
     }
 
-// SOAP helper
+
     private String callSoap(String soapRequest) throws Exception {
         java.net.URL url = new java.net.URL("http://localhost:9002/auth");
         java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
